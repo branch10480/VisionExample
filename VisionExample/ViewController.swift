@@ -15,6 +15,10 @@ class ViewController: UIViewController {
   private var previewLayer: AVCaptureVideoPreviewLayer!
   private let handler = VNSequenceRequestHandler()
   private let lockOnLayer = CALayer()
+  private let maxCountOfPitches: Int = 5
+  private var timer: Timer?
+  
+  private var pitches: [Double] = []
   
   @IBOutlet private weak var previewView: UIView!
   @IBOutlet private weak var rollLabel: UILabel!
@@ -40,6 +44,7 @@ class ViewController: UIViewController {
     setupVideoProcessing()
     setupCameraPreview()
     setupTargetView()
+    setupTimer()
   }
   
   private func setupVideoProcessing() {
@@ -99,21 +104,39 @@ class ViewController: UIViewController {
     DispatchQueue.main.async {
       self.lockOnLayer.frame = convertedRect
     }
-  }
     
+    if let pitch = observation.pitch as? Double {
+      pitches.insert(pitch, at: 0)
+      if pitches.count > maxCountOfPitches {
+        _ = pitches.popLast()
+      }
+    }
+  }
+  
   private func updateLabels(roll: String, yaw: String, pitch: String) {
     rollLabel.text = "roll\n" + roll
     yawLabel.text = "yaw\n" + yaw
     pitchLabel.text = "pitch\n" + pitch
   }
   
-}
+  private func setupTimer() {
+    timer = Timer.scheduledTimer(timeInterval: 0.3, target: self, selector: #selector(judgeAmplitude), userInfo: nil, repeats: true)
+  }
   
+  @objc private func judgeAmplitude() {
+    if let max = pitches.max(), let min = pitches.min() {
+      let distance = fabs(max - min)
+      print("## Distance: \(distance)")
+    }
+  }
+  
+}
+
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
 
 extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
   
-   func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+  func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
     guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
       return
     }
